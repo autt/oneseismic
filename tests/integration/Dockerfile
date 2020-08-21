@@ -4,12 +4,16 @@ COPY /tests/integration/requirements.txt .
 RUN pip install -r requirements.txt
 COPY /core/ingestion/upload/requirements-dev.txt .
 RUN pip install -r requirements-dev.txt
+COPY /client/oneseismic/requirements.txt .
+RUN pip install -r requirements.txt
+
 COPY /core/ingestion .
 RUN pip install ./upload
 RUN pip install ./scan
 
 COPY /tests/integration/integration_tests.py .
 COPY /tests/integration/data/small.sgy .
+COPY /client/oneseismic/client.py .
 
 COPY /tests/ssl/az.pem  /etc/ssl/certs/
 ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/az.pem

@@ -1,0 +1,4 @@
+msal
+pathlib
+requests
+ujson
