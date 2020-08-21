@@ -2,14 +2,13 @@ import os
 import pytest
 import io
 import json
-from upload import upload
-from scan import scan
 
 from urllib.parse import parse_qs, urlparse
 from azure.storage.blob import BlobServiceClient
-from azure.core.exceptions import ResourceExistsError
 import requests
 
+from upload import upload
+from scan import scan
 
 HOST_ADDR = os.getenv("HOST_ADDR", "http://localhost:8080")
 AUTH_ADDR = os.getenv("AUTH_ADDR", "http://localhost:8089")
