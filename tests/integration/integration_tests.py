@@ -35,7 +35,7 @@ def auth_header():
     }
     r = requests.get(
         AUTH_ADDR
-        + "/oauth2/token"
+        + "/oauth2/v2.0/authorize"
         + "?redirect_uri=3"
         + "&client_id=" + os.getenv("AUDIENCE")
         + "&grant_type=t"
@@ -43,8 +43,9 @@ def auth_header():
         + "&client_secret=s"
         + "&extra_claims=" + json.dumps(extra_claims),
         headers={"content-type": "application/json"},
+        allow_redirects=False,
     )
-    token = r.json()["access_token"]
+    token = parse_qs(urlparse(r.headers["Location"]).fragment)["access_token"][0]
 
     return {"Authorization": f"Bearer {token}"}
 
