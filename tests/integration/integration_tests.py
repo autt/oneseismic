@@ -11,7 +11,7 @@ import requests
 
 from upload import upload
 from scan import scan
-from client import client, cube
+from oneseismic import client, cube
 
 HOST_ADDR = os.getenv("HOST_ADDR", "http://localhost:8080")
 AUTH_ADDR = os.getenv("AUTH_ADDR", "http://localhost:8089")
