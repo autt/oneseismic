@@ -1,7 +1,5 @@
 import os
 import pytest
-import io
-import json
 import segyio
 import numpy as np
 
@@ -11,7 +9,7 @@ import requests
 
 from upload import upload
 from scan import scan
-from oneseismic import client, cube
+from oneseismic import client
 
 HOST_ADDR = os.getenv("HOST_ADDR", "http://localhost:8080")
 AUTH_ADDR = os.getenv("AUTH_ADDR", "http://localhost:8089")
@@ -20,21 +18,21 @@ AUTH_ADDR = os.getenv("AUTH_ADDR", "http://localhost:8089")
 with open("./small.sgy", "rb") as f:
     META = scan.scan(f)
 
+# TODO use obo
 def az_storage():
     protocol = "DefaultEndpointsProtocol=https;"
-    account_name = "AccountName={};".format(os.getenv("AZURE_STORAGE_ACCOUNT"))
-    account_key = "AccountKey={};".format(os.getenv("AZURE_STORAGE_ACCESS_KEY"))
-    uri = os.getenv("AZURE_STORAGE_URL").format(os.getenv("AZURE_STORAGE_ACCOUNT"))
+    account_name = "AccountName={};".format(
+        os.getenv("AZURE_STORAGE_ACCOUNT"))
+    account_key = "AccountKey={};".format(
+        os.getenv("AZURE_STORAGE_ACCESS_KEY"))
+    uri = os.getenv("AZURE_STORAGE_URL").format(
+        os.getenv("AZURE_STORAGE_ACCOUNT"))
     blob_endpoint = "BlobEndpoint={};".format(uri)
 
     return protocol + account_name + account_key + blob_endpoint
 
 
 def auth_header():
-    extra_claims = {
-        "aud": "https://storage.azure.com",
-        "iss": "https://sts.windows.net/",
-    }
     r = requests.get(
         AUTH_ADDR
         + "/oauth2/v2.0/authorize"
@@ -42,14 +40,14 @@ def auth_header():
         + "&client_id=" + os.getenv("AUDIENCE")
         + "&grant_type=t"
         + "&code=c"
-        + "&client_secret=s"
-        + "&extra_claims=" + json.dumps(extra_claims),
+        + "&client_secret=s",
         headers={"content-type": "application/json"},
         allow_redirects=False,
     )
-    token = parse_qs(urlparse(r.headers["Location"]).fragment)["access_token"][0]
+    token = parse_qs(urlparse(r.headers["Location"]).fragment)["access_token"]
 
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {token[0]}"}
+
 
 class client_auth:
     def __init__(self, auth):
@@ -57,6 +55,7 @@ class client_auth:
 
     def token(self):
         return self.auth
+
 
 AUTH_HEADER = auth_header()
 AUTH_CLIENT = client_auth(auth_header())
@@ -102,19 +101,25 @@ def test_cube_404(create_cubes):
 
 
 def test_dimensions(create_cubes):
-    r = requests.get(HOST_ADDR + "/" + META["guid"] + "/slice", headers=AUTH_HEADER)
+    r = requests.get(
+        HOST_ADDR + "/" + META["guid"] + "/slice",
+        headers=AUTH_HEADER)
     assert r.status_code == 200
     assert r.json() == [0, 1, 2]
 
 
 def test_lines(create_cubes):
-    r = requests.get(HOST_ADDR + "/" + META["guid"] + "/slice/1", headers=AUTH_HEADER)
+    r = requests.get(
+        HOST_ADDR + "/" + META["guid"] + "/slice/1", headers=AUTH_HEADER
+    )
     assert r.status_code == 200
     assert r.json() == META["dimensions"][1]
 
 
 def test_lines_404(create_cubes):
-    r = requests.get(HOST_ADDR + "/" + META["guid"] + "/slice/3", headers=AUTH_HEADER)
+    r = requests.get(
+        HOST_ADDR + "/" + META["guid"] + "/slice/3", headers=AUTH_HEADER
+    )
     assert r.status_code == 404
 
 
@@ -124,11 +129,17 @@ def tests_slices(create_cubes):
     cube = c.cube(cube_id)
 
     with segyio.open("small.sgy", "r") as f:
-         expected = segyio.cube(f)
+        expected = segyio.cube(f)
 
     for i in range(len(cube.dim0)):
-        assert np.allclose(cube.slice(0,cube.dim0[i]), expected[i,:,:], atol=1e-5)
+        assert np.allclose(
+            cube.slice(0, cube.dim0[i]),
+            expected[i, :, :], atol=1e-5)
     for i in range(len(cube.dim1)):
-        assert np.allclose(cube.slice(1,cube.dim1[i]), expected[:,i,:], atol=1e-5)
+        assert np.allclose(
+            cube.slice(1, cube.dim1[i]),
+            expected[:, i, :], atol=1e-5)
     for i in range(len(cube.dim2)):
-        assert np.allclose(cube.slice(2,cube.dim2[i]), expected[:,:,i], atol=1e-5)
+        assert np.allclose(
+            cube.slice(2, cube.dim2[i]),
+            expected[:, :, i], atol=1e-5)
