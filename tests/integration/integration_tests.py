@@ -1,6 +1,7 @@
 import os
 from urllib.parse import parse_qs, urlparse
 
+from hypothesis import given, strategies as st
 import numpy as np
 import pytest
 import requests
@@ -110,7 +111,7 @@ def test_lines_404(create_cubes):
     assert r.status_code == 404
 
 
-def tests_slices(create_cubes):
+def test_slices(create_cubes):
     c = client.client(API_ADDR, AUTH_CLIENT)
     cube_id = c.list_cubes()[0]
     cube = c.cube(cube_id)
@@ -118,6 +119,45 @@ def tests_slices(create_cubes):
     with segyio.open("small.sgy", "r") as f:
         expected = segyio.cube(f)
 
+    for i in range(len(cube.dim0)):
+        assert np.allclose(cube.slice(0, cube.dim0[i]), expected[i, :, :], atol=1e-5)
+    for i in range(len(cube.dim1)):
+        assert np.allclose(cube.slice(1, cube.dim1[i]), expected[:, i, :], atol=1e-5)
+    for i in range(len(cube.dim2)):
+        assert np.allclose(cube.slice(2, cube.dim2[i]), expected[:, :, i], atol=1e-5)
+
+def upload_cubes(data):
+    with open(data, "rb") as f:
+        meta = scan.scan(f)
+   
+    credential = CustomTokenCredential()
+    account_url = os.getenv("AZURE_STORAGE_URL").format(
+        os.getenv("AZURE_STORAGE_ACCOUNT")
+    )
+    blob_service_client = BlobServiceClient(account_url, credential)
+    for c in requests.get(API_ADDR, headers=AUTH_HEADER).json():
+        blob_service_client.get_container_client(c).delete_container()
+
+    shape = [64, 64, 64]
+    params = {"subcube-dims": shape}
+    with open(data, "rb") as f:
+        upload.upload(params, meta, f, blob_service_client)
+
+
+def test_slice_generated_cubes():
+    w, h, d = 3, 5, 7
+    data = [[[np.float32(x*y*z) for x in range(w)] for y in range(h)] for z in range(d)]
+    segyio.tools.from_array("expected.sgy", data)
+
+    upload_cubes("expected.sgy")
+
+    c = client.client(API_ADDR, AUTH_CLIENT)
+    cube_id = c.list_cubes()[0]
+    cube = c.cube(cube_id)
+
+    with segyio.open("expected.sgy", "r") as f:
+        expected = segyio.cube(f)
+    
     for i in range(len(cube.dim0)):
         assert np.allclose(cube.slice(0, cube.dim0[i]), expected[i, :, :], atol=1e-5)
     for i in range(len(cube.dim1)):
