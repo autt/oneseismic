@@ -1,6 +1,6 @@
 import os
 from urllib.parse import parse_qs, urlparse
-
+import tempfile
 from hypothesis import given, strategies as st
 import numpy as np
 import pytest
@@ -124,8 +124,13 @@ def test_slices(create_cubes):
     for i in range(len(cube.dim2)):
         assert np.allclose(cube.slice(2, cube.dim2[i]), expected[:, :, i], atol=1e-5)
 
+
 def upload_cubes(data):
-    with open(data, "rb") as f:
+
+    fname = tempfile.mktemp("segy")
+    segyio.tools.from_array(fname, data)
+
+    with open(fname, "rb") as f:
         meta = scan.scan(f)
 
     credential = CustomTokenCredential()
@@ -135,24 +140,25 @@ def upload_cubes(data):
 
     shape = [64, 64, 64]
     params = {"subcube-dims": shape}
-    with open(data, "rb") as f:
+    with open(fname, "rb") as f:
         upload.upload(params, meta, f, blob_service_client)
+
+    with segyio.open(fname, "r") as f:
+        expected = segyio.cube(f)
+
+    return expected
 
 
 def test_slice_generated_cubes():
     w, h, d = 3, 5, 7
     data = [[[np.float32(x*y*z) for x in range(w)] for y in range(h)] for z in range(d)]
-    segyio.tools.from_array("expected.sgy", data)
 
-    upload_cubes("expected.sgy")
+    expected = upload_cubes(data)
 
     c = client.client(API_ADDR, AUTH_CLIENT)
     cube_id = c.list_cubes()[0]
     cube = c.cube(cube_id)
 
-    with segyio.open("expected.sgy", "r") as f:
-        expected = segyio.cube(f)
-    
     for i in range(len(cube.dim0)):
         assert np.allclose(cube.slice(0, cube.dim0[i]), expected[i, :, :], atol=1e-5)
     for i in range(len(cube.dim1)):
