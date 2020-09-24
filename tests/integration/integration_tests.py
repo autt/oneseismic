@@ -143,25 +143,25 @@ def upload_cubes(data):
     with open(fname, "rb") as f:
         upload.upload(params, meta, f, blob_service_client)
 
-    with segyio.open(fname, "r") as f:
-        expected = segyio.cube(f)
-
-    return expected
 
 
 def test_slice_generated_cubes():
     w, h, d = 3, 5, 7
-    data = [[[np.float32(x*y*z) for x in range(w)] for y in range(h)] for z in range(d)]
+    data = np.ndarray(shape=(w,h,d), dtype=np.float32)
+    for i in range(w):
+        for j in range(h):
+            for k in range(d):
+                data[i,j,k] = i*j*k
 
-    expected = upload_cubes(data)
+    upload_cubes(data)
 
     c = client.client(API_ADDR, AUTH_CLIENT)
     cube_id = c.list_cubes()[0]
     cube = c.cube(cube_id)
 
     for i in range(len(cube.dim0)):
-        assert np.allclose(cube.slice(0, cube.dim0[i]), expected[i, :, :], atol=1e-5)
+        assert np.allclose(cube.slice(0, cube.dim0[i]), data[i, :, :], atol=1e-5)
     for i in range(len(cube.dim1)):
-        assert np.allclose(cube.slice(1, cube.dim1[i]), expected[:, i, :], atol=1e-5)
+        assert np.allclose(cube.slice(1, cube.dim1[i]), data[:, i, :], atol=1e-5)
     for i in range(len(cube.dim2)):
-        assert np.allclose(cube.slice(2, cube.dim2[i]), expected[:, :, i], atol=1e-5)
+        assert np.allclose(cube.slice(2, cube.dim2[i]), data[:, :, i], atol=1e-5)
